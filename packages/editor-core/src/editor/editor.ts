@@ -1,5 +1,5 @@
 import type { Project } from '../model/index.js';
-import type { EditOperation } from '../operations/index.js';
+import { EditOperationSchema, type EditOperation } from '../operations/index.js';
 import type { OperationError } from '../operations/validate.js';
 import { validateOperation } from '../operations/validate.js';
 import {
@@ -35,6 +35,18 @@ export function saveProject(state: EditorState): Project {
 }
 
 export function applyOperation(state: EditorState, operation: EditOperation): ApplyResult {
+  const parsed = EditOperationSchema.safeParse(operation);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errors: [
+        {
+          code: 'INVALID_OPERATION',
+          message: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),
+        },
+      ],
+    };
+  }
   const validation = validateOperation(getProject(state), operation);
   if (!validation.ok) {
     return { ok: false, errors: validation.errors };

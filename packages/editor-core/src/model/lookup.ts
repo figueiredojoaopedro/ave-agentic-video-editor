@@ -24,7 +24,7 @@ export function getTrack(project: Project, trackId: string): Track | undefined {
 }
 
 export function getAsset(project: Project, assetId: string): Asset | undefined {
-  return project.assets[assetId];
+  return Object.hasOwn(project.assets, assetId) ? project.assets[assetId] : undefined;
 }
 
 export function clipIdInUse(project: Project, clipId: string): boolean {
@@ -32,7 +32,7 @@ export function clipIdInUse(project: Project, clipId: string): boolean {
 }
 
 export function assetIdInUse(project: Project, assetId: string): boolean {
-  return assetId in project.assets;
+  return Object.hasOwn(project.assets, assetId);
 }
 
 export function isTrackCompatible(trackKind: TrackKind, assetKind: AssetKind): boolean {

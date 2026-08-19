@@ -4,6 +4,8 @@ export * from './model/index.js';
 export * from './operations/index.js';
 export * from './history/index.js';
 export * from './serialization/index.js';
+export * from './time.js';
+export * from './model/lookup.js';
 export {
   applyOperation,
   canRedo,

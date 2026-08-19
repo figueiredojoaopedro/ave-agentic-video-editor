@@ -136,6 +136,23 @@ describe('editor facade integration', () => {
     expect(getProject(state).timeline.tracks.every((t) => t.clips.length === 0)).toBe(true);
   });
 
+  it('rejects malformed operations at the schema boundary and leaves state untouched', () => {
+    const state = createProject('R');
+    const before = getProject(state);
+    const malformed = { type: 'splitClip', clipId: 'clip_1', atUs: 'banana', newClipId: 'clip_x' } as unknown as EditOperation;
+    const result = applyOperation(state, malformed);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors[0]!.code).toBe('INVALID_OPERATION');
+      expect(result.errors[0]!.message).toContain('atUs');
+    }
+    expect(getProject(state)).toEqual(before);
+
+    const unknownType = applyOperation(state, { type: 'nope' } as unknown as EditOperation);
+    expect(unknownType.ok).toBe(false);
+    expect(getProject(state)).toEqual(before);
+  });
+
   it('redo re-applies undone operations', () => {
     let state = createProject('R');
     const project = getProject(state);

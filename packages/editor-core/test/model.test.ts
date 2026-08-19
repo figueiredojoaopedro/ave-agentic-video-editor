@@ -25,6 +25,12 @@ describe('model schemas', () => {
     expect(ClipSchema.safeParse(bad).success).toBe(false);
   });
 
+  it('rejects a zero-duration clip', () => {
+    const clip = makeTestProject().timeline.tracks[0]!.clips[0]!;
+    const bad = { ...clip, sourceStartUs: 50, sourceEndUs: 50 };
+    expect(ClipSchema.safeParse(bad).success).toBe(false);
+  });
+
   it('parses a valid project', () => {
     expect(ProjectSchema.safeParse(makeTestProject()).success).toBe(true);
   });

@@ -13,11 +13,11 @@ export const ClipSchema = z
     volume: z.number().min(0).max(1).default(1),
   })
   .superRefine((clip, ctx) => {
-    if (clip.sourceEndUs < clip.sourceStartUs) {
-      ctx.addIssue({ code: 'custom', message: 'sourceEndUs must be >= sourceStartUs', path: ['sourceEndUs'] });
+    if (clip.sourceEndUs <= clip.sourceStartUs) {
+      ctx.addIssue({ code: 'custom', message: 'sourceEndUs must be > sourceStartUs', path: ['sourceEndUs'] });
     }
-    if (clip.timelineEndUs < clip.timelineStartUs) {
-      ctx.addIssue({ code: 'custom', message: 'timelineEndUs must be >= timelineStartUs', path: ['timelineEndUs'] });
+    if (clip.timelineEndUs <= clip.timelineStartUs) {
+      ctx.addIssue({ code: 'custom', message: 'timelineEndUs must be > timelineStartUs', path: ['timelineEndUs'] });
     }
     if (clip.sourceEndUs - clip.sourceStartUs !== clip.timelineEndUs - clip.timelineStartUs) {
       ctx.addIssue({
