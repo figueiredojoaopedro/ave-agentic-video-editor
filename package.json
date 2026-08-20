@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "dev:backend": "pnpm --filter @agentic-video-editor/desktop-backend dev",
     "dev:frontend": "pnpm --filter @agentic-video-editor/desktop-frontend dev",
-    "dev": "concurrently -k -n backend,frontend \"pnpm dev:backend\" \"pnpm dev:frontend\""
+    "dev:desktop": "pnpm --filter @agentic-video-editor/desktop dev",
+    "dev": "pnpm dev:desktop"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
