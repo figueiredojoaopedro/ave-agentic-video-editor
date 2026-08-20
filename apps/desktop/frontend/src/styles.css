@@ -1,0 +1,23 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #1b1d22; color: #e6e8ec; }
+.app { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.toolbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.toolbar-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button { padding: 4px 10px; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+input { padding: 4px 8px; }
+.workspace { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
+.media-bin { border: 1px solid #3a3d45; padding: 8px; border-radius: 6px; }
+.media-bin ul { list-style: none; padding: 0; margin: 8px 0; }
+.media-bin li { padding: 4px 0; font-size: 13px; }
+.timeline { border: 1px solid #3a3d45; border-radius: 6px; padding: 8px; position: relative; overflow-x: auto; }
+.timeline-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.timeline-body { position: relative; height: 120px; }
+.track { position: relative; height: 48px; margin-bottom: 8px; border: 1px solid #2a2d34; border-radius: 4px; background: #24262c; }
+.track-label { position: absolute; left: 4px; top: 2px; font-size: 11px; color: #8a8f98; }
+.clip { position: absolute; top: 14px; height: 26px; background: #2f6f9f; border-radius: 4px; overflow: hidden; white-space: nowrap; font-size: 12px; padding: 4px 6px; cursor: pointer; user-select: none; }
+.clip.selected { outline: 2px solid #ffd166; }
+.playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #ff5d5d; pointer-events: none; }
+.status { font-size: 13px; }
+.status.error { color: #ff8080; }
+.status.info { color: #9ad09a; }
