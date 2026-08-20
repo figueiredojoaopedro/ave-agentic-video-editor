@@ -11,6 +11,9 @@ coverage/
 playwright-report/
 test-results/
 
+# Backend local data
+.data/
+
 # Superpowers scratch (SDD workspaces, ledgers)
 .superpowers/
 
