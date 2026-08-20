@@ -116,6 +116,9 @@ importers:
       '@agentic-video-editor/editor-core':
         specifier: workspace:*
         version: link:../editor-core
+      '@agentic-video-editor/media':
+        specifier: workspace:*
+        version: link:../media
       zod:
         specifier: ^4.0.0
         version: 4.4.3
@@ -133,6 +136,9 @@ importers:
         specifier: ^4.0.0
         version: 4.4.3
     devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

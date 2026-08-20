@@ -4,3 +4,4 @@ export * from './runner.js';
 export * from './ir.js';
 export * from './compiler.js';
 export * from './args.js';
+export * from './render.js';
