@@ -8,10 +8,14 @@
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:backend": "pnpm --filter @agentic-video-editor/desktop-backend dev",
+    "dev:frontend": "pnpm --filter @agentic-video-editor/desktop-frontend dev",
+    "dev": "concurrently -k -n backend,frontend \"pnpm dev:backend\" \"pnpm dev:frontend\""
   },
   "devDependencies": {
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "concurrently": "^9.0.0"
   }
 }
