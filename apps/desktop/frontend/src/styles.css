@@ -21,3 +21,8 @@ input { padding: 4px 8px; }
 .status { font-size: 13px; }
 .status.error { color: #ff8080; }
 .status.info { color: #9ad09a; }
+.ai-panel { border: 1px solid #3a3d45; border-radius: 6px; padding: 8px; margin-top: 16px; }
+.chat-log { max-height: 180px; overflow-y: auto; margin: 8px 0; font-size: 13px; }
+.chat-line { margin: 4px 0; }
+.chat-line.user { color: #9fc6e8; }
+.chat-line.assistant { color: #d8dbe0; }

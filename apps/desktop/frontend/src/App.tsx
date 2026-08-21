@@ -1,3 +1,4 @@
+import { AiPanel } from './components/AiPanel';
 import { MediaBin } from './components/MediaBin';
 import { Timeline } from './components/Timeline';
 import { Toolbar } from './components/Toolbar';
@@ -19,6 +20,7 @@ export function App() {
         <MediaBin />
         <Timeline />
       </div>
+      <AiPanel />
       {renderResult && (
         <p className="status">
           Rendered {renderResult.outputPath} ({Math.round(renderResult.durationUs / 1000)}ms, video:{String(renderResult.hasVideo)}, audio:{String(renderResult.hasAudio)})

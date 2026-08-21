@@ -11,6 +11,9 @@ const api = vi.hoisted(() => ({
   saveProject: vi.fn(),
   loadProject: vi.fn(),
   renderProject: vi.fn(),
+  getAiConfig: vi.fn(),
+  saveAiConfig: vi.fn(),
+  aiChat: vi.fn(),
 }));
 
 vi.mock('../src/api', () => ({ api }));
@@ -46,6 +49,8 @@ describe('editorStore', () => {
       error: null,
       busy: false,
       info: null,
+      aiConfig: null,
+      aiMessages: [],
     });
   });
 
@@ -96,5 +101,38 @@ describe('editorStore', () => {
     useEditorStore.setState({ projectId: 'project_1' });
     await useEditorStore.getState().render();
     expect(useEditorStore.getState().renderResult?.hasVideo).toBe(true);
+  });
+
+  it('loadAiConfig stores the fetched config', async () => {
+    api.getAiConfig.mockResolvedValue({
+      config: { providerId: 'openai-compatible', model: 'gpt-4o-mini', hasApiKey: true },
+    });
+    await useEditorStore.getState().loadAiConfig();
+    expect(useEditorStore.getState().aiConfig?.model).toBe('gpt-4o-mini');
+  });
+
+  it('sendAiMessage calls the chat API and updates project + messages', async () => {
+    const project = makeProject();
+    api.aiChat.mockResolvedValue({
+      response: 'Done.',
+      appliedOperations: ['splitClip'],
+      project,
+    });
+    useEditorStore.setState({ projectId: 'project_1', project });
+    await useEditorStore.getState().sendAiMessage('Split it');
+    const state = useEditorStore.getState();
+    expect(api.aiChat).toHaveBeenCalledWith('project_1', 'Split it');
+    expect(state.aiMessages).toEqual([
+      { role: 'user', content: 'Split it' },
+      { role: 'assistant', content: 'Done.' },
+    ]);
+    expect(state.info).toContain('splitClip');
+  });
+
+  it('sendAiMessage records an error when the chat fails', async () => {
+    api.aiChat.mockRejectedValue(new Error('AI_NOT_CONFIGURED: no provider'));
+    useEditorStore.setState({ projectId: 'project_1', project: makeProject() });
+    await useEditorStore.getState().sendAiMessage('hi');
+    expect(useEditorStore.getState().error).toContain('AI_NOT_CONFIGURED');
   });
 });

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createId, type EditOperation, type Project } from '@agentic-video-editor/editor-core';
-import { api, type RenderResult } from './api';
+import { api, type PublicAIModelConfig, type RenderResult } from './api';
 
 export interface EditorStore {
   projectId: string | null;
@@ -11,6 +11,8 @@ export interface EditorStore {
   error: string | null;
   busy: boolean;
   info: string | null;
+  aiConfig: PublicAIModelConfig | null;
+  aiMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
 
   createProject: (name: string) => Promise<void>;
   importAsset: (path: string) => Promise<void>;
@@ -25,6 +27,15 @@ export interface EditorStore {
   render: () => Promise<void>;
   selectClip: (clipId: string | null) => void;
   setPlayhead: (us: number) => void;
+
+  loadAiConfig: () => Promise<void>;
+  saveAiConfig: (config: {
+    providerId: string;
+    model: string;
+    endpoint?: string;
+    apiKey?: string;
+  }) => Promise<void>;
+  sendAiMessage: (message: string) => Promise<void>;
 }
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
@@ -36,6 +47,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   error: null,
   busy: false,
   info: null,
+  aiConfig: null,
+  aiMessages: [],
 
   createProject: async (name) => {
     set({ busy: true, error: null, info: null });
@@ -174,6 +187,52 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   selectClip: (clipId) => set({ selectedClipId: clipId }),
   setPlayhead: (us) => set({ playheadUs: us }),
+
+  loadAiConfig: async () => {
+    set({ busy: true, error: null });
+    try {
+      const { config } = await api.getAiConfig();
+      set({ aiConfig: config });
+    } catch (error) {
+      set({ error: toMessage(error) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  saveAiConfig: async (config) => {
+    set({ busy: true, error: null });
+    try {
+      const result = await api.saveAiConfig(config);
+      set({ aiConfig: result.config, info: 'AI configuration saved' });
+    } catch (error) {
+      set({ error: toMessage(error) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  sendAiMessage: async (message) => {
+    const { projectId, aiMessages } = get();
+    if (!projectId) return;
+    const updated = [...aiMessages, { role: 'user' as const, content: message }];
+    set({ aiMessages: updated, busy: true, error: null });
+    try {
+      const result = await api.aiChat(projectId, message);
+      set({
+        aiMessages: [...updated, { role: 'assistant', content: result.response }],
+        project: result.project,
+        info:
+          result.appliedOperations.length > 0
+            ? `AI applied: ${result.appliedOperations.join(', ')}`
+            : 'AI made no edits',
+      });
+    } catch (error) {
+      set({ error: toMessage(error) });
+    } finally {
+      set({ busy: false });
+    }
+  },
 }));
 
 function findClip(project: Project, clipId: string) {

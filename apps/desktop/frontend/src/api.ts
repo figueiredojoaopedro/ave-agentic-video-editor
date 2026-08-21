@@ -86,4 +86,35 @@ export const api = {
       body: JSON.stringify(outputPath === undefined ? {} : { outputPath }),
     });
   },
+
+  getAiConfig(): Promise<{ config: PublicAIModelConfig | null }> {
+    return request('/api/ai/config');
+  },
+
+  saveAiConfig(config: {
+    providerId: string;
+    model: string;
+    endpoint?: string;
+    apiKey?: string;
+  }): Promise<{ config: PublicAIModelConfig }> {
+    return request('/api/ai/config', { method: 'POST', body: JSON.stringify(config) });
+  },
+
+  aiChat(projectId: string, message: string): Promise<AiChatResult> {
+    return request('/api/ai/chat', { method: 'POST', body: JSON.stringify({ projectId, message }) });
+  },
 };
+
+export interface PublicAIModelConfig {
+  providerId: string;
+  model: string;
+  endpoint?: string;
+  organizationId?: string;
+  hasApiKey: boolean;
+}
+
+export interface AiChatResult {
+  response: string;
+  appliedOperations: string[];
+  project: Project;
+}
