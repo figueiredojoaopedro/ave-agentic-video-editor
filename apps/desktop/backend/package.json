@@ -14,6 +14,7 @@
     "@agentic-video-editor/editor-core": "workspace:*",
     "@agentic-video-editor/ffmpeg": "workspace:*",
     "@agentic-video-editor/media": "workspace:*",
+    "@napi-rs/keyring": "^1.3.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "zod": "^4.0.0"
