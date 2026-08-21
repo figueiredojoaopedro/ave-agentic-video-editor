@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
-import { basename } from 'node:path';
+import { basename, isAbsolute } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { createId, type Asset, type Clip, type Project } from '@agentic-video-editor/editor-core';
@@ -33,8 +34,15 @@ export function createApp(options: AppOptions = {}): express.Express {
   const dataDir =
     options.dataDir ?? fileURLToPath(new URL('../.data/projects', import.meta.url));
 
+  const ALLOWED_ORIGINS = [
+    'http://127.0.0.1:5173',
+    'http://localhost:5173',
+    'tauri://localhost',
+    'http://tauri.localhost',
+  ];
+
   const app = express();
-  app.use(cors());
+  app.use(cors({ origin: ALLOWED_ORIGINS }));
   app.use(express.json({ limit: '2mb' }));
 
   app.get(`${API_PREFIX}/health`, (_req, res) => {
@@ -183,6 +191,15 @@ export function createApp(options: AppOptions = {}): express.Express {
     }
     try {
       const body = req.body ?? {};
+      if (body.outputPath !== undefined) {
+        if (typeof body.outputPath !== 'string' || !isPathInsideTempDir(body.outputPath)) {
+          res.status(400).json({
+            ok: false,
+            errors: [{ code: 'INVALID_OUTPUT_PATH', message: 'outputPath must be an absolute path inside the system temp directory' }],
+          });
+          return;
+        }
+      }
       const result = await renderProject(project, {
         ...(typeof body.outputPath === 'string' ? { outputPath: body.outputPath } : {}),
         ...(typeof body.width === 'number' ? { width: body.width } : {}),
@@ -199,6 +216,13 @@ export function createApp(options: AppOptions = {}): express.Express {
   });
 
   return app;
+}
+
+function isPathInsideTempDir(filePath: string): boolean {
+  if (!isAbsolute(filePath)) return false;
+  const base = tmpdir().toLowerCase().replace(/[\\/]+$/, '');
+  const lower = filePath.toLowerCase();
+  return lower.startsWith(`${base}\\`) || lower.startsWith(`${base}/`);
 }
 
 function getFirstProject(store: ProjectStore): Project | undefined {

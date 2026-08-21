@@ -119,4 +119,21 @@ describe('backend API', () => {
     expect(res.body.result.hasAudio).toBe(true);
     expect(existsSync(outPath)).toBe(true);
   });
+
+  it('does not set CORS headers for disallowed origins', async () => {
+    const res = await request(app).get('/api/health').set('Origin', 'http://evil.example');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('allows the frontend dev origin', async () => {
+    const res = await request(app).get('/api/health').set('Origin', 'http://127.0.0.1:5173');
+    expect(res.headers['access-control-allow-origin']).toBe('http://127.0.0.1:5173');
+  });
+
+  it('rejects render output paths outside the temp directory', async () => {
+    await request(app)
+      .post(`/api/projects/${projectId}/render`)
+      .send({ outputPath: 'C:\\Windows\\evil.mp4' })
+      .expect(400);
+  });
 });
