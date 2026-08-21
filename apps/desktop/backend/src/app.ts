@@ -1,9 +1,11 @@
 import cors from 'cors';
 import express from 'express';
-import { basename, isAbsolute } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { AIModelConfigSchema } from '@agentic-video-editor/ai-providers';
+import type { AgentContext } from '@agentic-video-editor/agent';
 import { createId, type Asset, type Clip, type Project } from '@agentic-video-editor/editor-core';
 import { renderProject, RenderError } from '@agentic-video-editor/ffmpeg';
 import { MediaProbeError, probeFile } from '@agentic-video-editor/media';
@@ -18,21 +20,30 @@ import {
   undoInStore,
   type ProjectStore,
 } from './store.js';
+import { AIConfigError, AIService } from './ai-service.js';
+import { createSecretStore } from './secure-store.js';
 
 export const API_PREFIX = '/api';
 
 export interface AppOptions {
   store?: ProjectStore;
   dataDir?: string;
+  ai?: AIService;
 }
 
 const NameSchema = z.object({ name: z.string().min(1) });
 const PathSchema = z.object({ path: z.string().min(1) });
+const ChatSchema = z.object({ projectId: z.string().min(1), message: z.string().min(1) });
 
 export function createApp(options: AppOptions = {}): express.Express {
   const store = options.store ?? createStore();
   const dataDir =
     options.dataDir ?? fileURLToPath(new URL('../.data/projects', import.meta.url));
+  const ai =
+    options.ai ??
+    new AIService({
+      secretStore: createSecretStore({ filePath: join(dataDir, '..', 'secrets.json') }),
+    });
 
   const ALLOWED_ORIGINS = [
     'http://127.0.0.1:5173',
@@ -211,6 +222,58 @@ export function createApp(options: AppOptions = {}): express.Express {
     }
   });
 
+  app.get(`${API_PREFIX}/ai/config`, async (_req, res) => {
+    try {
+      const config = await ai.getConfig();
+      res.json({ ok: true, config });
+    } catch (error) {
+      res.status(500).json({ ok: false, errors: [{ code: 'AI_CONFIG_FAILED', message: toMessage(error) }] });
+    }
+  });
+
+  app.post(`${API_PREFIX}/ai/config`, async (req, res) => {
+    const parsed = AIModelConfigSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, errors: [{ code: 'INVALID_REQUEST', message: 'invalid AI configuration' }] });
+      return;
+    }
+    try {
+      const config = await ai.saveConfig(parsed.data);
+      res.json({ ok: true, config });
+    } catch (error) {
+      res.status(500).json({ ok: false, errors: [{ code: 'AI_CONFIG_FAILED', message: toMessage(error) }] });
+    }
+  });
+
+  app.post(`${API_PREFIX}/ai/chat`, async (req, res) => {
+    const parsed = ChatSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, errors: [{ code: 'INVALID_REQUEST', message: 'projectId and message are required' }] });
+      return;
+    }
+    const { projectId, message } = parsed.data;
+    if (!getProjectFromStore(store, projectId)) {
+      res.status(404).json({ ok: false, errors: [{ code: 'PROJECT_NOT_FOUND', message: `project not found: ${projectId}` }] });
+      return;
+    }
+    try {
+      const context = agentContextForProject(store, projectId);
+      const result = await ai.chat(context, message);
+      res.json({
+        ok: true,
+        response: result.response,
+        appliedOperations: result.appliedOperations,
+        project: result.project,
+      });
+    } catch (error) {
+      if (error instanceof AIConfigError) {
+        res.status(400).json({ ok: false, errors: [{ code: 'AI_NOT_CONFIGURED', message: error.message }] });
+        return;
+      }
+      res.status(500).json({ ok: false, errors: [{ code: 'AI_CHAT_FAILED', message: toMessage(error) }] });
+    }
+  });
+
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     res.status(500).json({ ok: false, errors: [{ code: 'INTERNAL', message: toMessage(error) }] });
   });
@@ -230,6 +293,25 @@ function getFirstProject(store: ProjectStore): Project | undefined {
     return getProjectFromStore(store, state.base.id);
   }
   return undefined;
+}
+
+function agentContextForProject(store: ProjectStore, projectId: string): AgentContext {
+  return {
+    getProject() {
+      const project = getProjectFromStore(store, projectId);
+      if (!project) throw new Error(`project not found: ${projectId}`);
+      return project;
+    },
+    applyOperation(operation) {
+      return applyOperationToStore(store, projectId, operation);
+    },
+    undo() {
+      return undoInStore(store, projectId);
+    },
+    redo() {
+      return redoInStore(store, projectId);
+    },
+  };
 }
 
 function toMessage(error: unknown): string {

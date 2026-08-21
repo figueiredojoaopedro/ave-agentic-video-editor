@@ -11,6 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@agentic-video-editor/agent": "workspace:*",
+    "@agentic-video-editor/ai-providers": "workspace:*",
     "@agentic-video-editor/editor-core": "workspace:*",
     "@agentic-video-editor/ffmpeg": "workspace:*",
     "@agentic-video-editor/media": "workspace:*",

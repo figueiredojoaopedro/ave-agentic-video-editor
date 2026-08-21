@@ -29,6 +29,12 @@ importers:
 
   apps/desktop/backend:
     dependencies:
+      '@agentic-video-editor/agent':
+        specifier: workspace:*
+        version: link:../../../packages/agent
+      '@agentic-video-editor/ai-providers':
+        specifier: workspace:*
+        version: link:../../../packages/ai-providers
       '@agentic-video-editor/editor-core':
         specifier: workspace:*
         version: link:../../../packages/editor-core
