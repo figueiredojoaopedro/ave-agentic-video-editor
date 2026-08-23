@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createId, type Project } from '@agentic-video-editor/editor-core';
 import { probeFile } from '@agentic-video-editor/media';
+import type { RenderCache } from './cache.js';
 import { buildFfmpegArgs } from './args.js';
 import { buildRenderManifest, type CompileOptions } from './compiler.js';
 import { planDurationUs, type RenderManifest } from './ir.js';
@@ -36,6 +37,8 @@ export type RunFn = (args: string[], options: RunOptions) => Promise<RunResult>;
 export interface RenderQueueOptions {
   outputDir?: string;
   durationToleranceUs?: number;
+  /** Optional manifest-hash-keyed render cache. Cache hits skip ffmpeg entirely. */
+  cache?: RenderCache;
   /** Injectable ffmpeg runner for deterministic tests. Defaults to runFfmpeg. */
   run?: RunFn;
 }
@@ -46,10 +49,12 @@ export class RenderQueue {
   private readonly outputDir: string;
   private readonly toleranceUs: number;
   private readonly run: RunFn;
+  private readonly cache: RenderCache | undefined;
   private drainPromise: Promise<void> | null = null;
 
   constructor(options: RenderQueueOptions = {}) {
-    this.outputDir = options.outputDir ?? join(tmpdir(), 'ave-renders');
+    this.cache = options.cache;
+    this.outputDir = options.outputDir ?? this.cache?.cacheDir ?? join(tmpdir(), 'ave-renders');
     this.toleranceUs = options.durationToleranceUs ?? 200_000;
     this.run = options.run ?? runFfmpeg;
   }
@@ -125,15 +130,18 @@ export class RenderQueue {
     const durationUs = planDurationUs(job.manifest);
 
     try {
-      await this.run(
-        [...buildFfmpegArgs(job.manifest, outputPath), '-progress', 'pipe:1', '-nostats'],
-        {
-          signal: job.controller.signal,
-          onProgress: (outTimeUs) => {
-            job.info.progress = durationUs > 0 ? Math.min(1, outTimeUs / durationUs) : 0;
+      const cached = this.cache ? await this.cache.has(job.info.manifestHash) : false;
+      if (!cached) {
+        await this.run(
+          [...buildFfmpegArgs(job.manifest, outputPath), '-progress', 'pipe:1', '-nostats'],
+          {
+            signal: job.controller.signal,
+            onProgress: (outTimeUs) => {
+              job.info.progress = durationUs > 0 ? Math.min(1, outTimeUs / durationUs) : 0;
+            },
           },
-        },
-      );
+        );
+      }
 
       const info = await probeFile(outputPath);
       if (Math.abs(info.durationUs - durationUs) > this.toleranceUs) {
