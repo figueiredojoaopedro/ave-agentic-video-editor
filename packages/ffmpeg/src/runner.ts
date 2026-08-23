@@ -68,6 +68,7 @@ export function runFfmpeg(args: string[], options: RunOptions = {}): Promise<Run
     options.signal?.addEventListener('abort', onAbort, { once: true });
 
     const timer = setTimeout(() => {
+      cleanup();
       child.kill();
       reject(new FfmpegError(`ffmpeg timed out after ${timeoutMs}ms`));
     }, timeoutMs);

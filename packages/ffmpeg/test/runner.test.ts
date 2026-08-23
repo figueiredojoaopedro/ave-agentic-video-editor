@@ -78,8 +78,9 @@ describe('runFfmpeg', () => {
     const promise = runFfmpeg(
       [
         '-y',
+        '-re',
         '-f', 'lavfi',
-        '-i', 'testsrc=duration=10:size=320x240:rate=30',
+        '-i', 'testsrc=duration=2:size=320x240:rate=30',
         '-pix_fmt', 'yuv420p',
         join(dir, 'out.mp4'),
       ],
