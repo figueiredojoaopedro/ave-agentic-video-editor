@@ -142,6 +142,20 @@ describe('editorStore', () => {
     expect(useEditorStore.getState().renderStatus).toBe('cancelled');
   });
 
+  it('cancelRender leaves status intact when the cancel call fails', async () => {
+    api.renderProject.mockResolvedValue({ jobId: 'job_1' });
+    api.getRenderJob.mockResolvedValue({
+      job: { id: 'job_1', status: 'running', progress: 0.5, manifestHash: 'hash' },
+    });
+    api.cancelRenderJob.mockRejectedValue(new Error('cancel failed'));
+    useEditorStore.setState({ projectId: 'project_1' });
+    await useEditorStore.getState().render();
+    await useEditorStore.getState().cancelRender();
+    expect(useEditorStore.getState().error).toContain('cancel failed');
+    expect(useEditorStore.getState().renderStatus).toBe('running');
+    expect(useEditorStore.getState().renderJobId).toBe('job_1');
+  });
+
   it('loadAiConfig stores the fetched config', async () => {
     api.getAiConfig.mockResolvedValue({
       config: { providerId: 'openai-compatible', model: 'gpt-4o-mini', hasApiKey: true },

@@ -102,4 +102,30 @@ describe('RenderCache', () => {
     expect(info2.result?.hasVideo).toBe(true);
     expect(info2.result?.outputPath).toBe(cache.resolvePath(info2.manifestHash));
   });
+
+  it('uses the cache path as authoritative even when an outputDir is also provided', async () => {
+    const separateDir = mkdtempSync(join(tmpdir(), 'ave-out-'));
+    const localCacheDir = mkdtempSync(join(tmpdir(), 'ave-cache2-'));
+    const localCache = new RenderCache({ cacheDir: localCacheDir });
+    let runCount = 0;
+    const queue = new RenderQueue({
+      outputDir: separateDir,
+      cache: localCache,
+      run: async (args, options) => {
+        runCount += 1;
+        return runFfmpeg(args, options);
+      },
+    });
+    const project = projectWith(fixture.avPath);
+    const job1 = queue.enqueue(project);
+    const info1 = await waitForTerminal(queue, job1.id);
+    expect(info1.status).toBe('completed');
+    expect(info1.result?.outputPath).toBe(localCache.resolvePath(info1.manifestHash));
+    const job2 = queue.enqueue(project);
+    const info2 = await waitForTerminal(queue, job2.id);
+    expect(info2.status).toBe('completed');
+    expect(runCount).toBe(1);
+    rmSync(separateDir, { recursive: true, force: true });
+    rmSync(localCacheDir, { recursive: true, force: true });
+  });
 });

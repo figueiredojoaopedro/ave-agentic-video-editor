@@ -126,7 +126,9 @@ export class RenderQueue {
     job.info.startedAt = Date.now();
     job.controller = new AbortController();
 
-    const outputPath = join(this.outputDir, `${job.info.manifestHash}.mp4`);
+    const outputPath = this.cache
+      ? this.cache.resolvePath(job.info.manifestHash)
+      : join(this.outputDir, `${job.info.manifestHash}.mp4`);
     const durationUs = planDurationUs(job.manifest);
 
     try {

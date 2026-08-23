@@ -237,9 +237,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   cancelRender: async () => {
     const { renderJobId } = get();
     if (!renderJobId) return;
-    stopPolling();
     try {
       await api.cancelRenderJob(renderJobId);
+      stopPolling();
       set({ renderStatus: 'cancelled', renderJobId: null });
     } catch (error) {
       set({ error: toMessage(error) });
