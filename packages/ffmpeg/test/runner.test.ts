@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FfmpegError, runFfmpeg } from '../src/runner.js';
+import { FfmpegCancelledError, FfmpegError, runFfmpeg } from '../src/runner.js';
 
 describe('runFfmpeg', () => {
   const dirs: string[] = [];
@@ -50,5 +50,50 @@ describe('runFfmpeg', () => {
     await expect(
       runFfmpeg(['-version'], { ffmpegPath: 'definitely-not-an-ffmpeg-binary' }),
     ).rejects.toBeInstanceOf(FfmpegError);
+  });
+
+  it('reports progress via onProgress when -progress pipe:1 is used', async () => {
+    const progress: number[] = [];
+    const dir = tempDir();
+    await runFfmpeg(
+      [
+        '-y',
+        '-f', 'lavfi',
+        '-i', 'testsrc=duration=2:size=160x120:rate=15',
+        '-pix_fmt', 'yuv420p',
+        '-progress', 'pipe:1',
+        '-nostats',
+        join(dir, 'out.mp4'),
+      ],
+      { onProgress: (us) => progress.push(us) },
+    );
+    expect(progress.length).toBeGreaterThan(0);
+    expect(progress.every((us) => us >= 0)).toBe(true);
+    expect(progress[progress.length - 1]!).toBeGreaterThan(0);
+  });
+
+  it('cancels a running encode via AbortSignal and rejects with FfmpegCancelledError', async () => {
+    const controller = new AbortController();
+    const dir = tempDir();
+    const promise = runFfmpeg(
+      [
+        '-y',
+        '-f', 'lavfi',
+        '-i', 'testsrc=duration=10:size=320x240:rate=30',
+        '-pix_fmt', 'yuv420p',
+        join(dir, 'out.mp4'),
+      ],
+      { signal: controller.signal, timeoutMs: 60_000 },
+    );
+    setTimeout(() => controller.abort(), 400);
+    await expect(promise).rejects.toBeInstanceOf(FfmpegCancelledError);
+  });
+
+  it('rejects immediately when the signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(runFfmpeg(['-version'], { signal: controller.signal })).rejects.toBeInstanceOf(
+      FfmpegCancelledError,
+    );
   });
 });
