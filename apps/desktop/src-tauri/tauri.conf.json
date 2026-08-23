@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.agenticvideoeditor.desktop",
   "build": {
-    "beforeDevCommand": "concurrently -k \"pnpm --filter @agentic-video-editor/desktop-backend dev\" \"pnpm --filter @agentic-video-editor/desktop-frontend dev\"",
+    "beforeDevCommand": "dev-servers.cmd",
     "devUrl": "http://127.0.0.1:5173",
     "beforeBuildCommand": "pnpm --filter @agentic-video-editor/desktop-frontend build",
     "frontendDist": "../frontend/dist"
@@ -30,6 +30,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "certificateThumbprint": "E21F75314A88D11797214DD81C415386C3D89CFE",
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com"
+    }
   }
 }
