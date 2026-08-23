@@ -1,5 +1,7 @@
 import {
   applyOperation as applyEditorOperation,
+  canRedo as editorCanRedo,
+  canUndo as editorCanUndo,
   createProject as createEditorProject,
   deserializeProject,
   getProject,
@@ -62,6 +64,16 @@ export function redoInStore(store: ProjectStore, id: string): Project | undefine
   const next = redo(state);
   store.states.set(id, next);
   return getProject(next);
+}
+
+export function canUndoInStore(store: ProjectStore, id: string): boolean {
+  const state = store.states.get(id);
+  return state !== undefined && editorCanUndo(state);
+}
+
+export function canRedoInStore(store: ProjectStore, id: string): boolean {
+  const state = store.states.get(id);
+  return state !== undefined && editorCanRedo(state);
 }
 
 export async function saveProjectToDisk(store: ProjectStore, id: string, dataDir: string): Promise<string> {

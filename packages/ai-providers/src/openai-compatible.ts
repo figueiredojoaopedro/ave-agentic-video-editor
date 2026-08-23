@@ -88,7 +88,11 @@ function parseWireResponse(data: unknown): AIResponse {
   if (typeof data !== 'object' || data === null) throw new ProviderError('invalid provider response shape');
   const choices = (data as { choices?: unknown }).choices;
   if (!Array.isArray(choices) || choices.length === 0) throw new ProviderError('provider response has no choices');
-  const message = (choices[0] as { message?: unknown }).message;
+  const firstChoice = choices[0];
+  if (typeof firstChoice !== 'object' || firstChoice === null) {
+    throw new ProviderError('provider response has an invalid first choice');
+  }
+  const message = (firstChoice as { message?: unknown }).message;
   if (typeof message !== 'object' || message === null) throw new ProviderError('provider response has no message');
   const wireMessage = message as { content?: unknown; tool_calls?: unknown };
   const content = typeof wireMessage.content === 'string' ? wireMessage.content : '';

@@ -68,4 +68,10 @@ describe('createOpenAiCompatibleProvider', () => {
     const provider = createOpenAiCompatibleProvider({ endpoint: 'https://api.example.com/v1', apiKey: 'sk', fetchImpl });
     await expect(provider.generate({ model: 'm', messages: [] })).rejects.toBeInstanceOf(ProviderError);
   });
+
+  it('throws ProviderError (not TypeError) for a null first choice', async () => {
+    const fetchImpl = mockFetchOnce({ ok: true, status: 200, json: async () => ({ choices: [null] }) });
+    const provider = createOpenAiCompatibleProvider({ endpoint: 'https://api.example.com/v1', apiKey: 'sk', fetchImpl });
+    await expect(provider.generate({ model: 'm', messages: [] })).rejects.toBeInstanceOf(ProviderError);
+  });
 });

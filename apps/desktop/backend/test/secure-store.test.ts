@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createSecretStore, type KeyringLike } from '../src/secure-store.js';
+import { createSecretStore, loadKeyringSafely, type KeyringLike } from '../src/secure-store.js';
 
 describe('secure-store', () => {
   const dirs: string[] = [];
@@ -36,6 +36,17 @@ describe('secure-store', () => {
     const filePath = tempFile();
     await createSecretStore({ filePath }).set('ai.apiKey', 'sk-1');
     await expect(createSecretStore({ filePath }).get('ai.apiKey')).resolves.toBe('sk-1');
+  });
+
+  it('keyring-backed store round-trips when the OS keyring is available', async () => {
+    const keyring = await loadKeyringSafely('ave-keyring-test');
+    if (!keyring) return;
+    const store = createSecretStore({ filePath: tempFile(), keyring });
+    const key = `test-${Date.now()}`;
+    await store.set(key, 'sk-keyring');
+    await expect(store.get(key)).resolves.toBe('sk-keyring');
+    await store.delete(key);
+    await expect(store.get(key)).resolves.toBeUndefined();
   });
 
   it('keyring store delegates to the keyring', async () => {

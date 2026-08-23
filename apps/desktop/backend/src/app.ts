@@ -11,6 +11,8 @@ import { renderProject, RenderError } from '@agentic-video-editor/ffmpeg';
 import { MediaProbeError, probeFile } from '@agentic-video-editor/media';
 import {
   applyOperationToStore,
+  canRedoInStore,
+  canUndoInStore,
   createProjectInStore,
   createStore,
   getProjectFromStore,
@@ -245,6 +247,15 @@ export function createApp(options: AppOptions = {}): express.Express {
     }
   });
 
+  app.delete(`${API_PREFIX}/ai/config`, async (_req, res) => {
+    try {
+      await ai.clearConfig();
+      res.json({ ok: true, config: null });
+    } catch (error) {
+      res.status(500).json({ ok: false, errors: [{ code: 'AI_CONFIG_FAILED', message: toMessage(error) }] });
+    }
+  });
+
   app.post(`${API_PREFIX}/ai/chat`, async (req, res) => {
     const parsed = ChatSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
@@ -306,10 +317,10 @@ function agentContextForProject(store: ProjectStore, projectId: string): AgentCo
       return applyOperationToStore(store, projectId, operation);
     },
     undo() {
-      return undoInStore(store, projectId);
+      return canUndoInStore(store, projectId) ? undoInStore(store, projectId) : undefined;
     },
     redo() {
-      return redoInStore(store, projectId);
+      return canRedoInStore(store, projectId) ? redoInStore(store, projectId) : undefined;
     },
   };
 }

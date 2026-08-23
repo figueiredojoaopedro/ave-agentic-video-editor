@@ -86,6 +86,13 @@ describe('AI endpoints', () => {
     expect(videoClips).toHaveLength(2);
   });
 
+  it('clears the AI configuration', async () => {
+    const res = await request(app).delete('/api/ai/config').expect(200);
+    expect(res.body.ok).toBe(true);
+    const fetched = await request(app).get('/api/ai/config').expect(200);
+    expect(fetched.body.config).toBeNull();
+  });
+
   it('rejects chat when no provider is configured', async () => {
     const app2 = createApp({
       store: createStore(),

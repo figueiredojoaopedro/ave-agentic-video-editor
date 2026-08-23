@@ -46,6 +46,11 @@ export class AIService {
     return toPublicConfig(storedKey ? { ...rest, apiKey: storedKey } : rest);
   }
 
+  async clearConfig(): Promise<void> {
+    await this.secretStore.delete(CONFIG_KEY);
+    await this.secretStore.delete(API_KEY_KEY);
+  }
+
   async chat(context: AgentContext, userMessage: string): Promise<AgentResult> {
     const raw = await this.secretStore.get(CONFIG_KEY);
     if (!raw) throw new AIConfigError('AI provider is not configured');

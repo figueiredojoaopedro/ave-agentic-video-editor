@@ -151,6 +151,17 @@ describe('runAgent', () => {
     expect(result.response).toContain('maximum number of tool iterations');
   });
 
+  it('reports nothing-to-undo honestly and does not record it', async () => {
+    const { context } = makeContext();
+    const provider = scriptedProvider([
+      { content: 'undoing', toolCalls: [{ id: 'call_1', name: 'undo', arguments: '{}' }] },
+      { content: 'done', toolCalls: [] },
+    ]);
+    const result = await runAgent({ context, provider, model: 'm', tools: ALL_TOOLS, userMessage: 'undo' });
+    expect(result.appliedOperations).toEqual([]);
+    expect(result.response).toBe('done');
+  });
+
   it('read-only tools do not record applied operations', async () => {
     const { context } = makeContext();
     const provider = scriptedProvider([
