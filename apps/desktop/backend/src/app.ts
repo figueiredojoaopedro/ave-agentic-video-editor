@@ -1,13 +1,12 @@
 import cors from 'cors';
 import express from 'express';
-import { basename, isAbsolute, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { AIModelConfigSchema } from '@agentic-video-editor/ai-providers';
 import type { AgentContext } from '@agentic-video-editor/agent';
 import { createId, type Asset, type Clip, type Project } from '@agentic-video-editor/editor-core';
-import { renderProject, RenderError } from '@agentic-video-editor/ffmpeg';
+import { RenderCache, RenderQueue, type CompileOptions } from '@agentic-video-editor/ffmpeg';
 import { MediaProbeError, probeFile } from '@agentic-video-editor/media';
 import {
   applyOperationToStore,
@@ -31,6 +30,7 @@ export interface AppOptions {
   store?: ProjectStore;
   dataDir?: string;
   ai?: AIService;
+  renderQueue?: RenderQueue;
 }
 
 const NameSchema = z.object({ name: z.string().min(1) });
@@ -46,6 +46,10 @@ export function createApp(options: AppOptions = {}): express.Express {
     new AIService({
       secretStore: createSecretStore({ filePath: join(dataDir, '..', 'secrets.json') }),
     });
+
+  const renderQueue =
+    options.renderQueue ??
+    new RenderQueue({ cache: new RenderCache({ cacheDir: join(dataDir, '..', 'renders') }) });
 
   const ALLOWED_ORIGINS = [
     'http://127.0.0.1:5173',
@@ -196,32 +200,40 @@ export function createApp(options: AppOptions = {}): express.Express {
     }
   });
 
-  app.post(`${API_PREFIX}/projects/:id/render`, async (req, res) => {
+  app.post(`${API_PREFIX}/projects/:id/render`, (req, res) => {
     const project = getProjectFromStore(store, req.params.id);
     if (!project) {
       res.status(404).json({ ok: false, errors: [{ code: 'PROJECT_NOT_FOUND', message: `project not found: ${req.params.id}` }] });
       return;
     }
+    const body = req.body ?? {};
+    const compileOptions: CompileOptions = {};
+    if (typeof body.width === 'number') compileOptions.width = body.width;
+    if (typeof body.height === 'number') compileOptions.height = body.height;
     try {
-      const body = req.body ?? {};
-      if (body.outputPath !== undefined) {
-        if (typeof body.outputPath !== 'string' || !isPathInsideTempDir(body.outputPath)) {
-          res.status(400).json({
-            ok: false,
-            errors: [{ code: 'INVALID_OUTPUT_PATH', message: 'outputPath must be an absolute path inside the system temp directory' }],
-          });
-          return;
-        }
-      }
-      const result = await renderProject(project, {
-        ...(typeof body.outputPath === 'string' ? { outputPath: body.outputPath } : {}),
-        ...(typeof body.width === 'number' ? { width: body.width } : {}),
-        ...(typeof body.height === 'number' ? { height: body.height } : {}),
-      });
-      res.json({ ok: true, result });
+      const job = renderQueue.enqueue(project, compileOptions);
+      res.status(202).json({ ok: true, jobId: job.id });
     } catch (error) {
-      res.status(500).json({ ok: false, errors: [{ code: 'RENDER_FAILED', message: toMessage(error) }] });
+      res.status(400).json({ ok: false, errors: [{ code: 'RENDER_COMPILE_FAILED', message: toMessage(error) }] });
     }
+  });
+
+  app.get(`${API_PREFIX}/jobs/:id`, (req, res) => {
+    const job = renderQueue.get(req.params.id);
+    if (!job) {
+      res.status(404).json({ ok: false, errors: [{ code: 'JOB_NOT_FOUND', message: `job not found: ${req.params.id}` }] });
+      return;
+    }
+    res.json({ ok: true, job });
+  });
+
+  app.post(`${API_PREFIX}/jobs/:id/cancel`, (req, res) => {
+    const cancelled = renderQueue.cancel(req.params.id);
+    if (!cancelled) {
+      res.status(404).json({ ok: false, errors: [{ code: 'JOB_NOT_FOUND', message: `job not found or not cancellable: ${req.params.id}` }] });
+      return;
+    }
+    res.json({ ok: true, cancelled: true });
   });
 
   app.get(`${API_PREFIX}/ai/config`, async (_req, res) => {
@@ -290,13 +302,6 @@ export function createApp(options: AppOptions = {}): express.Express {
   });
 
   return app;
-}
-
-function isPathInsideTempDir(filePath: string): boolean {
-  if (!isAbsolute(filePath)) return false;
-  const base = tmpdir().toLowerCase().replace(/[\\/]+$/, '');
-  const lower = filePath.toLowerCase();
-  return lower.startsWith(`${base}\\`) || lower.startsWith(`${base}/`);
 }
 
 function getFirstProject(store: ProjectStore): Project | undefined {

@@ -13,6 +13,17 @@ describe('end-to-end editing path', () => {
   let app: ReturnType<typeof createApp>;
   let projectId: string;
 
+  async function waitForJob(app: ReturnType<typeof createApp>, jobId: string, timeoutMs = 15_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const res = await request(app).get(`/api/jobs/${jobId}`).expect(200);
+      const status = res.body.job.status as string;
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') return res.body.job;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(`job ${jobId} did not finish within ${timeoutMs}ms`);
+  }
+
   beforeAll(async () => {
     fixture = await generateFixtureMedia();
     dataDir = mkdtempSync(join(tmpdir(), 'ave-e2e-'));
@@ -66,16 +77,15 @@ describe('end-to-end editing path', () => {
     const reloadedId = loaded.body.id as string;
 
     // 7. Render the reloaded project and verify the output against the timeline state
-    const outPath = join(dataDir, 'e2e-render.mp4');
     const rendered = await request(app)
       .post(`/api/projects/${reloadedId}/render`)
-      .send({ outputPath: outPath, width: 320, height: 240 })
-      .expect(200);
-    expect(rendered.body.ok).toBe(true);
-    expect(rendered.body.result.hasVideo).toBe(true);
-    expect(rendered.body.result.hasAudio).toBe(true);
-    expect(existsSync(outPath)).toBe(true);
-    // Remaining clip is 0..400ms → rendered duration ≈ 400ms (±200ms tolerance)
-    expect(Math.abs(rendered.body.result.durationUs - 400_000)).toBeLessThanOrEqual(200_000);
+      .send({ width: 320, height: 240 })
+      .expect(202);
+    const jobId = rendered.body.jobId as string;
+    const job = await waitForJob(app, jobId);
+    expect(job.status).toBe('completed');
+    expect(job.result.hasVideo).toBe(true);
+    expect(job.result.hasAudio).toBe(true);
+    expect(Math.abs(job.result.durationUs - 400_000)).toBeLessThanOrEqual(200_000);
   });
 });

@@ -26,6 +26,17 @@ describe('backend API', () => {
   let projectId: string;
   let importedClipId: string;
 
+  async function waitForJob(app: ReturnType<typeof createApp>, jobId: string, timeoutMs = 15_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const res = await request(app).get(`/api/jobs/${jobId}`).expect(200);
+      const status = res.body.job.status as string;
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') return res.body.job;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(`job ${jobId} did not finish within ${timeoutMs}ms`);
+  }
+
   beforeAll(async () => {
     fixture = await generateFixtureMedia();
     dataDir = mkdtempSync(join(tmpdir(), 'ave-backend-data-'));
@@ -108,16 +119,18 @@ describe('backend API', () => {
     await request(app).post('/api/import').send({ path: join(tmpdir(), 'nope-missing.mp4') }).expect(400);
   });
 
-  it('renders the project to an output file', async () => {
-    const outPath = join(dataDir, 'render-output.mp4');
+  it('enqueues a render job that completes', async () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/render`)
-      .send({ outputPath: outPath, width: 320, height: 240 })
-      .expect(200);
+      .send({ width: 320, height: 240 })
+      .expect(202);
     expect(res.body.ok).toBe(true);
-    expect(res.body.result.hasVideo).toBe(true);
-    expect(res.body.result.hasAudio).toBe(true);
-    expect(existsSync(outPath)).toBe(true);
+    const jobId = res.body.jobId as string;
+    const job = await waitForJob(app, jobId);
+    expect(job.status).toBe('completed');
+    expect(job.result.hasVideo).toBe(true);
+    expect(job.result.hasAudio).toBe(true);
+    expect(job.result.outputPath).toBeTruthy();
   });
 
   it('does not set CORS headers for disallowed origins', async () => {
@@ -130,10 +143,7 @@ describe('backend API', () => {
     expect(res.headers['access-control-allow-origin']).toBe('http://127.0.0.1:5173');
   });
 
-  it('rejects render output paths outside the temp directory', async () => {
-    await request(app)
-      .post(`/api/projects/${projectId}/render`)
-      .send({ outputPath: 'C:\\Windows\\evil.mp4' })
-      .expect(400);
+  it('returns 404 for an unknown job', async () => {
+    await request(app).get('/api/jobs/does-not-exist').expect(404);
   });
 });
