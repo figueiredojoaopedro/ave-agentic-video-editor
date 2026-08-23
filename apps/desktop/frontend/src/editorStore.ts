@@ -2,11 +2,54 @@ import { create } from 'zustand';
 import { createId, type EditOperation, type Project } from '@agentic-video-editor/editor-core';
 import { api, type PublicAIModelConfig, type RenderResult } from './api';
 
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+function stopPolling(): void {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function startPolling(jobId: string): void {
+  stopPolling();
+  const tick = async () => {
+    try {
+      const { job } = await api.getRenderJob(jobId);
+      const terminal = job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
+      useEditorStore.setState({
+        renderStatus: job.status,
+        renderProgress: job.progress,
+        renderResult: job.result ?? null,
+        renderJobId: terminal ? null : jobId,
+      });
+      if (job.status === 'completed') {
+        stopPolling();
+        useEditorStore.setState({ info: `Render complete: ${job.result?.outputPath ?? ''}` });
+      } else if (job.status === 'failed') {
+        stopPolling();
+        useEditorStore.setState({ error: job.error ?? 'render failed' });
+      } else if (job.status === 'cancelled') {
+        stopPolling();
+        useEditorStore.setState({ info: 'Render cancelled' });
+      }
+    } catch (error) {
+      stopPolling();
+      useEditorStore.setState({ error: toMessage(error) });
+    }
+  };
+  void tick();
+  pollTimer = setInterval(tick, 500);
+}
+
 export interface EditorStore {
   projectId: string | null;
   project: Project | null;
   playheadUs: number;
   selectedClipId: string | null;
+  renderJobId: string | null;
+  renderStatus: 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  renderProgress: number;
   renderResult: RenderResult | null;
   error: string | null;
   busy: boolean;
@@ -25,6 +68,7 @@ export interface EditorStore {
   saveProject: () => Promise<void>;
   loadProject: (path: string) => Promise<void>;
   render: () => Promise<void>;
+  cancelRender: () => Promise<void>;
   selectClip: (clipId: string | null) => void;
   setPlayhead: (us: number) => void;
 
@@ -43,6 +87,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   project: null,
   playheadUs: 0,
   selectedClipId: null,
+  renderJobId: null,
+  renderStatus: 'idle',
+  renderProgress: 0,
   renderResult: null,
   error: null,
   busy: false,
@@ -174,14 +221,28 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   render: async () => {
     const { projectId } = get();
     if (!projectId) return;
-    set({ busy: true, error: null, renderResult: null });
+    stopPolling();
+    set({ busy: true, error: null, renderJobId: null, renderStatus: 'pending', renderProgress: 0, renderResult: null });
     try {
-      const { result } = await api.renderProject(projectId);
-      set({ renderResult: result, info: `Render complete: ${result.outputPath}` });
+      const { jobId } = await api.renderProject(projectId);
+      set({ renderJobId: jobId, renderStatus: 'pending' });
+      startPolling(jobId);
     } catch (error) {
-      set({ error: toMessage(error) });
+      set({ error: toMessage(error), renderStatus: 'failed' });
     } finally {
       set({ busy: false });
+    }
+  },
+
+  cancelRender: async () => {
+    const { renderJobId } = get();
+    if (!renderJobId) return;
+    stopPolling();
+    try {
+      await api.cancelRenderJob(renderJobId);
+      set({ renderStatus: 'cancelled', renderJobId: null });
+    } catch (error) {
+      set({ error: toMessage(error) });
     }
   },
 

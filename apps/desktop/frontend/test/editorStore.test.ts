@@ -11,6 +11,8 @@ const api = vi.hoisted(() => ({
   saveProject: vi.fn(),
   loadProject: vi.fn(),
   renderProject: vi.fn(),
+  getRenderJob: vi.fn(),
+  cancelRenderJob: vi.fn(),
   getAiConfig: vi.fn(),
   saveAiConfig: vi.fn(),
   aiChat: vi.fn(),
@@ -45,6 +47,9 @@ describe('editorStore', () => {
       project: null,
       playheadUs: 0,
       selectedClipId: null,
+      renderJobId: null,
+      renderStatus: 'idle',
+      renderProgress: 0,
       renderResult: null,
       error: null,
       busy: false,
@@ -94,13 +99,47 @@ describe('editorStore', () => {
     expect(api.applyOperation).not.toHaveBeenCalled();
   });
 
-  it('render stores the render result', async () => {
-    api.renderProject.mockResolvedValue({
-      result: { outputPath: '/tmp/out.mp4', durationUs: 100_000, hasVideo: true, hasAudio: true },
+  it('render stores the render result after the job completes', async () => {
+    api.renderProject.mockResolvedValue({ jobId: 'job_1' });
+    api.getRenderJob.mockResolvedValue({
+      job: {
+        id: 'job_1',
+        status: 'completed',
+        progress: 1,
+        manifestHash: 'hash',
+        result: { outputPath: '/tmp/out.mp4', durationUs: 100_000, hasVideo: true, hasAudio: true },
+      },
     });
     useEditorStore.setState({ projectId: 'project_1' });
     await useEditorStore.getState().render();
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(useEditorStore.getState().renderResult?.hasVideo).toBe(true);
+  });
+
+  it('render enqueues a job and starts polling', async () => {
+    api.renderProject.mockResolvedValue({ jobId: 'job_1' });
+    api.getRenderJob.mockResolvedValue({
+      job: { id: 'job_1', status: 'running', progress: 0.5, manifestHash: 'hash' },
+    });
+    useEditorStore.setState({ projectId: 'project_1' });
+    await useEditorStore.getState().render();
+    expect(api.renderProject).toHaveBeenCalledWith('project_1');
+    expect(useEditorStore.getState().renderJobId).toBe('job_1');
+    expect(useEditorStore.getState().renderStatus).toBe('running');
+    expect(useEditorStore.getState().renderProgress).toBe(0.5);
+  });
+
+  it('cancelRender cancels a running job', async () => {
+    api.renderProject.mockResolvedValue({ jobId: 'job_1' });
+    api.getRenderJob.mockResolvedValue({
+      job: { id: 'job_1', status: 'running', progress: 0.5, manifestHash: 'hash' },
+    });
+    api.cancelRenderJob.mockResolvedValue({ cancelled: true });
+    useEditorStore.setState({ projectId: 'project_1' });
+    await useEditorStore.getState().render();
+    await useEditorStore.getState().cancelRender();
+    expect(api.cancelRenderJob).toHaveBeenCalledWith('job_1');
+    expect(useEditorStore.getState().renderStatus).toBe('cancelled');
   });
 
   it('loadAiConfig stores the fetched config', async () => {

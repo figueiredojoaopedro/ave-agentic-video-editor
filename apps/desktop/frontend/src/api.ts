@@ -9,6 +9,18 @@ export interface RenderResult {
   hasAudio: boolean;
 }
 
+export interface RenderJobInfo {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  progress: number;
+  manifestHash: string;
+  error?: string;
+  result?: RenderResult;
+  createdAt: number;
+  startedAt?: number;
+  finishedAt?: number;
+}
+
 export interface ApiError {
   code: string;
   message: string;
@@ -80,11 +92,19 @@ export const api = {
     return request('/api/import', { method: 'POST', body: JSON.stringify({ path }) });
   },
 
-  renderProject(id: string, outputPath?: string): Promise<{ result: RenderResult }> {
+  renderProject(id: string, options?: { width?: number; height?: number }): Promise<{ jobId: string }> {
     return request(`/api/projects/${id}/render`, {
       method: 'POST',
-      body: JSON.stringify(outputPath === undefined ? {} : { outputPath }),
+      body: JSON.stringify(options ?? {}),
     });
+  },
+
+  getRenderJob(jobId: string): Promise<{ job: RenderJobInfo }> {
+    return request(`/api/jobs/${jobId}`);
+  },
+
+  cancelRenderJob(jobId: string): Promise<{ cancelled: boolean }> {
+    return request(`/api/jobs/${jobId}/cancel`, { method: 'POST' });
   },
 
   getAiConfig(): Promise<{ config: PublicAIModelConfig | null }> {

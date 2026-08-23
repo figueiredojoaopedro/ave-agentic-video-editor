@@ -8,6 +8,10 @@ export function App() {
   const error = useEditorStore((state) => state.error);
   const info = useEditorStore((state) => state.info);
   const renderResult = useEditorStore((state) => state.renderResult);
+  const renderStatus = useEditorStore((state) => state.renderStatus);
+  const renderProgress = useEditorStore((state) => state.renderProgress);
+  const cancelRender = useEditorStore((state) => state.cancelRender);
+  const busy = useEditorStore((state) => state.busy);
   const project = useEditorStore((state) => state.project);
 
   return (
@@ -21,6 +25,12 @@ export function App() {
         <Timeline />
       </div>
       <AiPanel />
+      {(renderStatus === 'pending' || renderStatus === 'running') && (
+        <div className="render-status">
+          <span>Rendering… {Math.round(renderProgress * 100)}%</span>
+          <button disabled={busy} onClick={() => void cancelRender()}>Cancel</button>
+        </div>
+      )}
       {renderResult && (
         <p className="status">
           Rendered {renderResult.outputPath} ({Math.round(renderResult.durationUs / 1000)}ms, video:{String(renderResult.hasVideo)}, audio:{String(renderResult.hasAudio)})
