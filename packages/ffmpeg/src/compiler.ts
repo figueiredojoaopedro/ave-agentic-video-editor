@@ -3,12 +3,11 @@ import {
   DEFAULT_FRAME_RATE,
   DEFAULT_RENDER_HEIGHT,
   DEFAULT_RENDER_WIDTH,
-  type RenderPlan,
+  type RenderManifest,
   type RenderSegment,
 } from './ir.js';
 
 export interface CompileOptions {
-  outputPath: string;
   width?: number;
   height?: number;
   frameRate?: number;
@@ -21,7 +20,7 @@ export class CompileError extends Error {
   }
 }
 
-export function compileTimeline(project: Project, options: CompileOptions): RenderPlan {
+export function buildRenderManifest(project: Project, options: CompileOptions = {}): RenderManifest {
   const videoTrack = project.timeline.tracks.find((track) => track.kind === 'video');
   if (!videoTrack) throw new CompileError('project has no video track');
   if (videoTrack.clips.length === 0) throw new CompileError('video track has no clips');
@@ -29,9 +28,7 @@ export function compileTimeline(project: Project, options: CompileOptions): Rend
   const segments: RenderSegment[] = videoTrack.clips.map((clip) => {
     const asset = project.assets[clip.assetId];
     if (!asset) throw new CompileError(`clip ${clip.id} references missing asset ${clip.assetId}`);
-    if (asset.kind !== 'video') {
-      throw new CompileError(`asset kind ${asset.kind} is not yet renderable`);
-    }
+    if (asset.kind !== 'video') throw new CompileError(`asset kind ${asset.kind} is not yet renderable`);
     return {
       sourcePath: asset.path,
       sourceStartUs: clip.sourceStartUs,
@@ -52,10 +49,12 @@ export function compileTimeline(project: Project, options: CompileOptions): Rend
   }
 
   return {
-    outputPath: options.outputPath,
-    width: options.width ?? DEFAULT_RENDER_WIDTH,
-    height: options.height ?? DEFAULT_RENDER_HEIGHT,
-    frameRate: options.frameRate ?? DEFAULT_FRAME_RATE,
+    version: 1,
+    output: {
+      width: options.width ?? DEFAULT_RENDER_WIDTH,
+      height: options.height ?? DEFAULT_RENDER_HEIGHT,
+      frameRate: options.frameRate ?? DEFAULT_FRAME_RATE,
+    },
     segments,
   };
 }

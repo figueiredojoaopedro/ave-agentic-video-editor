@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Project } from '@agentic-video-editor/editor-core';
 import { probeFile } from '@agentic-video-editor/media';
 import { buildFfmpegArgs } from './args.js';
-import { compileTimeline, type CompileOptions } from './compiler.js';
+import { buildRenderManifest, type CompileOptions } from './compiler.js';
 import { planDurationUs } from './ir.js';
 import { runFfmpeg } from './runner.js';
 
@@ -41,20 +41,20 @@ export async function renderProject(project: Project, options: RenderOptions = {
     options.outputPath ??
     join(tmpdir(), `ave-render-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`);
 
-  const compileOptions: CompileOptions = { outputPath };
+  const compileOptions: CompileOptions = {};
   if (options.width !== undefined) compileOptions.width = options.width;
   if (options.height !== undefined) compileOptions.height = options.height;
   if (options.frameRate !== undefined) compileOptions.frameRate = options.frameRate;
 
-  let plan;
+  let manifest;
   try {
-    plan = compileTimeline(project, compileOptions);
+    manifest = buildRenderManifest(project, compileOptions);
   } catch (error) {
     throw new RenderError(`failed to compile render plan: ${toMessage(error)}`, toError(error));
   }
 
   try {
-    await runFfmpeg(buildFfmpegArgs(plan));
+    await runFfmpeg(buildFfmpegArgs(manifest, outputPath));
   } catch (error) {
     throw new RenderError(`ffmpeg render failed: ${toMessage(error)}`, toError(error));
   }
@@ -66,7 +66,7 @@ export async function renderProject(project: Project, options: RenderOptions = {
     throw new RenderError(`render produced unreadable output: ${toMessage(error)}`, toError(error));
   }
 
-  const expectedDurationUs = planDurationUs(plan);
+  const expectedDurationUs = planDurationUs(manifest);
   const toleranceUs = options.durationToleranceUs ?? DEFAULT_DURATION_TOLERANCE_US;
   if (Math.abs(info.durationUs - expectedDurationUs) > toleranceUs) {
     throw new RenderError(

@@ -10,11 +10,13 @@ export interface RenderSegment {
   volume: number;
 }
 
-export interface RenderPlan {
-  outputPath: string;
-  width: number;
-  height: number;
-  frameRate: number;
+export interface RenderManifest {
+  version: 1;
+  output: {
+    width: number;
+    height: number;
+    frameRate: number;
+  };
   segments: RenderSegment[];
 }
 
@@ -22,9 +24,9 @@ export const DEFAULT_RENDER_WIDTH = 1280;
 export const DEFAULT_RENDER_HEIGHT = 720;
 export const DEFAULT_FRAME_RATE = 30;
 
-export function planDurationUs(plan: RenderPlan): Time {
+export function planDurationUs(manifest: RenderManifest): Time {
   let end: Time = 0;
-  for (const segment of plan.segments) {
+  for (const segment of manifest.segments) {
     if (segment.timelineEndUs > end) end = segment.timelineEndUs;
   }
   return end;
